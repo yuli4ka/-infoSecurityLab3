@@ -35,12 +35,35 @@ public class SHA256 {
     private static final int BLOCK_BYTES = BLOCK_BITS / 8;
 
     private static final int[] W = new int[64];
-    private static int[] h = new int[8];
-    private static final int[] TEMP = new int[8];
+    private static final int[] h = new int[8];
+    private static final int[] temp = new int[8];
 
     public static byte[] hash(byte[] message) {
-        h = H0;
+        System.arraycopy(H0, 0, h, 0, H0.length);
+        int[] words = padMes(message);
 
+        for (int i = 0; i < words.length / 16; i++) {
+            System.arraycopy(words, i * 16, W, 0, 16);
+            for (int t = 16; t < W.length; t++) {
+                W[t] = smallSig1(W[t - 2]) + W[t - 7] + smallSig0(W[t - 15]) + W[t - 16];
+            }
+            System.arraycopy(h, 0, temp, 0, h.length);
+            for (int t = 0; t < W.length; t++) {
+                int t1 = temp[7] + bigSig1(temp[4]) + ch(temp[4], temp[5], temp[6]) + K[t] + W[t];
+                int t2 = bigSig0(temp[0]) + maj(temp[0], temp[1], temp[2]);
+                System.arraycopy(temp, 0, temp, 1, temp.length - 1);
+                temp[4] += t1;
+                temp[0] = t1 + t2;
+            }
+            for (int t = 0; t < h.length; ++t) {
+                h[t] += temp[t];
+            }
+        }
+        return toByteArray(h);
+    }
+
+    private static int ch(int x, int y, int z) {
+        return (x & y) | ((~x) & z);
     }
 
     private static int[] padMes(byte[] message) {
@@ -66,4 +89,39 @@ public class SHA256 {
         return res.array();
     }
 
+    private static byte[] toByteArray(int[] ints) {
+        ByteBuffer buf = ByteBuffer.allocate(ints.length * Integer.BYTES);
+        for (int i : ints) {
+            buf.putInt(i);
+        }
+        return buf.array();
+    }
+
+    private static int maj(int x, int y, int z) {
+        return (x & y) | (x & z) | (y & z);
+    }
+
+    private static int bigSig0(int x) {
+        return Integer.rotateRight(x, 2)
+                ^ Integer.rotateRight(x, 13)
+                ^ Integer.rotateRight(x, 22);
+    }
+
+    private static int bigSig1(int x) {
+        return Integer.rotateRight(x, 6)
+                ^ Integer.rotateRight(x, 11)
+                ^ Integer.rotateRight(x, 25);
+    }
+
+    private static int smallSig0(int x) {
+        return Integer.rotateRight(x, 7)
+                ^ Integer.rotateRight(x, 18)
+                ^ (x >>> 3);
+    }
+
+    private static int smallSig1(int x) {
+        return Integer.rotateRight(x, 17)
+                ^ Integer.rotateRight(x, 19)
+                ^ (x >>> 10);
+    }
 }
